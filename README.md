@@ -42,10 +42,14 @@ prefix = (
 )
 ``` 
 ##### we will get the Wisconsin Breast Cancer dataset from the UCI Machine Learning Repository
+
 ###### Dataset Information
+
 Features are computed from a digitized image of a fine needle aspirate (FNA) of a breast mass. They describe characteristics of the cell nuclei present in the image.
+
 ######Attribute Information
-| ID number    |  Diagnosis (M = malignant, B = benign)   | radius     |  texture           |  perimeter         |  area |  smoothness              | compactness | concavity | concave points|symmetry | fractal dimension |radius_se| texture_se| perimeter_se|  |  area_se |  smoothness_se  | compactness_se | concavity_se | concave points_se|symmetry_se | fractal dimension_se| radius_worst  |  texture _worst  |  perimeter_worst  |  area_worst |  smoothness  _worst | compactness_worst | concavity_worst | concave points_worst|symmetry _worst| fractal dimension_worst|
+
+| ID number    |  Diagnosis (M = malignant, B = benign)   | radius     |  texture           |  perimeter         |  area |  smoothness              | compactness | concavity | concave points|symmetry | fractal dimension |radius_se| texture_se| perimeter_se|  area_se |  smoothness_se  | compactness_se | concavity_se | concave points_se|symmetry_se | fractal dimension_se| radius_worst  | texture_worst| perimeter_worst|  area_worst |  smoothness_worst| compactness_worst | concavity_worst| concave points_worst|symmetry_worst | fractal dimension_wort|
 
 ```
 #get the data
@@ -61,9 +65,100 @@ data.columns = ["id","diagnosis","radius","texture","perimeter","area","smoothne
 #save the data
 data.to_csv("data.csv", sep=',', index=False)
 ```
+##### for the data preparation, check the [notebook](https://github.com/nadinelabidi/Breast-Cancer-Detection/blob/main/Breast%20Cancer%20detection.ipynb)
 
+##### Linear Learner Algorithm
+Our problem is a classification problem and for that we will use linear models.
+Linear models are supervised learning algorithms used for solving either classification or regression problems.
+The Amazon SageMaker linear learner algorithm provides a solution for both classification and regression problems. With the SageMaker algorithm, you can simultaneously explore different training objectives and choose the best solution from a validation set. supports both recordIO-wrapped protobuf and CSV formats. For the application/x-recordio-protobuf input type, only Float32 tensors are supported. 
 
+Amazon SageMaker’s Linear Learner actually fits many models in parallel, each with slightly different hyperparameters, and then returns the one with the best fit. for that we will create a job that will train and validate "32" models
    
 
+```
+linear_job = "linear_learner_job"
 
+print("Job name is:", linear_job)
+
+linear_training_params = {
+    "RoleArn": role,
+    "TrainingJobName": linear_job,
+    "AlgorithmSpecification": {"TrainingImage": container, "TrainingInputMode": "File"},
+    "ResourceConfig": {"InstanceCount": 1, "InstanceType": "ml.c4.2xlarge", "VolumeSizeInGB": 10},
+    "InputDataConfig": [
+        {
+            "ChannelName": "train",
+            "DataSource": {
+                "S3DataSource": {
+                    "S3DataType": "S3Prefix",
+                    "S3Uri": "s3://{}/{}/train/".format(bucket, prefix),
+                    "S3DataDistributionType": "ShardedByS3Key",
+                }
+            },
+            "CompressionType": "None",
+            "RecordWrapperType": "None",
+        },
+        {
+            "ChannelName": "validation",
+            "DataSource": {
+                "S3DataSource": {
+                    "S3DataType": "S3Prefix",
+                    "S3Uri": "s3://{}/{}/validation/".format(bucket, prefix),
+                    "S3DataDistributionType": "FullyReplicated",
+                }
+            },
+            "CompressionType": "None",
+            "RecordWrapperType": "None",
+        },
+    ],
+    "OutputDataConfig": {"S3OutputPath": "s3://{}/{}/".format(bucket, prefix)},
+    "HyperParameters": {
+        "feature_dim": "30",
+        "mini_batch_size": "100",
+        "predictor_type": "regressor",
+        "epochs": "10",
+        "num_models": "32",
+        "loss": "absolute_loss",
+    },
+    "StoppingCondition": {"MaxRuntimeInSeconds": 60 * 60},
+}
+```
+##### training the linear model
+```
+linear_hosting_container = {
+    "Image": container,
+    "ModelDataUrl": sm.describe_training_job(TrainingJobName=linear_job)["ModelArtifacts"][
+        "S3ModelArtifacts"
+    ],
+}
+
+create_model_response = sm.create_model(
+    ModelName=linear_job, ExecutionRoleArn=role, PrimaryContainer=linear_hosting_container
+)
+
+print(create_model_response["ModelArn"])
+```
+##### Now that we’ve trained the linear algorithm on our data, let’s setup a model which can later be hosted. We will:
+###### Point to the scoring container
+###### Point to the model.tar.gz that came from training  
+###### Create the hosting model
+```
+linear_endpoint_config = "DEMO-linear-endpoint-config-" + time.strftime(
+    "%Y-%m-%d-%H-%M-%S", time.gmtime()
+)
+print(linear_endpoint_config)
+create_endpoint_config_response = sm.create_endpoint_config(
+    EndpointConfigName=linear_endpoint_config,
+    ProductionVariants=[
+        {
+            "InstanceType": "ml.m4.xlarge",
+            "InitialInstanceCount": 1,
+            "ModelName": linear_job,
+            "VariantName": "AllTraffic",
+        }
+    ],
+)
+
+print("Endpoint Config Arn: " + create_endpoint_config_response["EndpointConfigArn"])
+```
 
