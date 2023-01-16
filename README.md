@@ -161,4 +161,118 @@ create_endpoint_config_response = sm.create_endpoint_config(
 
 print("Endpoint Config Arn: " + create_endpoint_config_response["EndpointConfigArn"])
 ```
+```python
+linear_endpoint_config = "DEMO-linear-endpoint-config-" + time.strftime(
+    "%Y-%m-%d-%H-%M-%S", time.gmtime()
+)
+print(linear_endpoint_config)
+create_endpoint_config_response = sm.create_endpoint_config(
+    EndpointConfigName=linear_endpoint_config,
+    ProductionVariants=[
+        {
+            "InstanceType": "ml.m4.xlarge",
+            "InitialInstanceCount": 1,
+            "ModelName": linear_job,
+            "VariantName": "AllTraffic",
+        }
+    ],
+)
+
+print("Endpoint Config Arn: " + create_endpoint_config_response["EndpointConfigArn"])
+```
+
+    DEMO-linear-endpoint-config-2023-01-16-18-07-39
+    Endpoint Config Arn: arn:aws:sagemaker:us-east-1:138973825716:endpoint-config/demo-linear-endpoint-config-2023-01-16-18-07-39
+
+
+
+```python
+%%time
+
+linear_endpoint = "DEMO-linear-endpoint-" + time.strftime("%Y%m%d%H%M", time.gmtime())
+print(linear_endpoint)
+create_endpoint_response = sm.create_endpoint(
+    EndpointName=linear_endpoint, EndpointConfigName=linear_endpoint_config
+)
+print(create_endpoint_response["EndpointArn"])
+
+resp = sm.describe_endpoint(EndpointName=linear_endpoint)
+status = resp["EndpointStatus"]
+print("Status: " + status)
+
+sm.get_waiter("endpoint_in_service").wait(EndpointName=linear_endpoint)
+
+resp = sm.describe_endpoint(EndpointName=linear_endpoint)
+status = resp["EndpointStatus"]
+print("Arn: " + resp["EndpointArn"])
+print("Status: " + status)
+
+if status != "InService":
+    raise Exception("Endpoint creation did not succeed")
+```
+
+    DEMO-linear-endpoint-202301161807
+    arn:aws:sagemaker:us-east-1:138973825716:endpoint/demo-linear-endpoint-202301161807
+    Status: Creating
+    Arn: arn:aws:sagemaker:us-east-1:138973825716:endpoint/demo-linear-endpoint-202301161807
+    Status: InService
+    CPU times: user 133 ms, sys: 8.7 ms, total: 142 ms
+    Wall time: 5min 1s
+
+
+
+```python
+def np2csv(arr):
+    csv = io.BytesIO()
+    np.savetxt(csv, arr, delimiter=",", fmt="%g")
+    return csv.getvalue().decode().rstrip()
+```
+
+
+```python
+runtime = boto3.client("runtime.sagemaker")
+
+payload = np2csv(X_test)
+response = runtime.invoke_endpoint(
+    EndpointName=linear_endpoint, ContentType="text/csv", Body=payload
+)
+result = json.loads(response["Body"].read().decode())
+test_pred = np.array([r["score"] for r in result["predictions"]])
+```
+
+
+```python
+test_mae_linear = np.mean(np.abs(y_test - test_pred))
+test_mae_baseline = np.mean(
+    np.abs(y_test - np.median(y_train))
+)  ## training median as baseline predictor
+
+print("Test MAE Baseline :", round(test_mae_baseline, 3))
+print("Test MAE Linear:", round(test_mae_linear, 3))
+```
+
+    Test MAE Baseline : 0.396
+    Test MAE Linear: 0.197
+
+
+
+```python
+test_pred_class = (test_pred > 0.5) + 0
+test_pred_baseline = np.repeat(np.median(y_train), len(y_test))
+
+prediction_accuracy = np.mean((y_test == test_pred_class)) * 100
+baseline_accuracy = np.mean((y_test == test_pred_baseline)) * 100
+
+print("Prediction Accuracy:", round(prediction_accuracy, 1), "%")
+print("Baseline Accuracy:", round(baseline_accuracy, 1), "%")
+```
+
+    Prediction Accuracy: 96.2 %
+    Baseline Accuracy: 60.4 %
+
+
+
+```python
+sm.delete_endpoint(EndpointName=linear_endpoint)
+```
 
