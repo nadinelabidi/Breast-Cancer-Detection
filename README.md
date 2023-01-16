@@ -28,6 +28,7 @@ import sagemaker.amazon.common as smac
 import sagemaker
 ``` 
 ##### Get the execution role for the sagemakersession and fix the file were your data  ```
+```
 # get the execution role for the sagemaker session
 role = sagemaker.get_execution_role()
 # get the region of the current session
@@ -40,10 +41,10 @@ prefix = (
     "sagemaker/breast-cancer-prediction"  # place to upload training files within the bucket
 )
 ``` 
-3. we will get the Wisconsin Breast Cancer dataset from the UCI Machine Learning Repository
-     - Dataset Information
+##### we will get the Wisconsin Breast Cancer dataset from the UCI Machine Learning Repository
+###### Dataset Information
 Features are computed from a digitized image of a fine needle aspirate (FNA) of a breast mass. They describe characteristics of the cell nuclei present in the image.
-     - Attribute Information
+######Attribute Information
 | ID number    |  Diagnosis (M = malignant, B = benign)   | radius     |  texture           |  perimeter         |  area |  smoothness              | compactness | concavity | concave points|symmetry | fractal dimension |radius_se| texture_se| perimeter_se|  |  area_se |  smoothness_se  | compactness_se | concavity_se | concave points_se|symmetry_se | fractal dimension_se| radius_worst  |  texture _worst  |  perimeter_worst  |  area_worst |  smoothness  _worst | compactness_worst | concavity_worst | concave points_worst|symmetry _worst| fractal dimension_worst|
 
 ```
