@@ -14,7 +14,7 @@ We will start by creating a (ml.t2.medium,Amazon Linux2,Jupyter lab 3) instance.
 ### Create a Jupyter Notebook
 To start scripting for training and deploying your model, create a Jupyter notebook in the SageMaker notebook instance. Using the Jupyter notebook, you can conduct machine learning (ML) experiments for training and inference while accessing the SageMaker features and the AWS infrastructure.
 
-1. For this notebook, we will start with importing the necessary packages
+##### For this notebook, we will start with importing the necessary packages
 ```
 import pandas as pd
 import numpy as np
@@ -27,7 +27,7 @@ import json
 import sagemaker.amazon.common as smac
 import sagemaker
 ``` 
-2. Get the execution role for the sagemakersession and fix the file were your data  ```
+##### Get the execution role for the sagemakersession and fix the file were your data  ```
 # get the execution role for the sagemaker session
 role = sagemaker.get_execution_role()
 # get the region of the current session
